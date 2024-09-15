@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode"
 import { ClaudeDevProvider } from "./providers/ClaudeDevProvider"
+import delay from "delay"
 
 /*
 Built using https://github.com/microsoft/vscode-webview-ui-toolkit
@@ -53,27 +54,37 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	)
 
-	const openClaudeDevInNewTab = () => {
+	const openClaudeDevInNewTab = async () => {
 		outputChannel.appendLine("Opening Claude Dev in new tab")
 		// (this example uses webviewProvider activation event which is necessary to deserialize cached webview, but since we use retainContextWhenHidden, we don't need to use that event)
 		// https://github.com/microsoft/vscode-extension-samples/blob/main/webview-sample/src/extension.ts
 		const tabProvider = new ClaudeDevProvider(context, outputChannel)
 		//const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined
 		const lastCol = Math.max(...vscode.window.visibleTextEditors.map((editor) => editor.viewColumn || 0))
-		const targetCol = Math.max(lastCol + 1, 1)
+
+		// Check if there are any visible text editors, otherwise open a new group to the right
+		const hasVisibleEditors = vscode.window.visibleTextEditors.length > 0
+		if (!hasVisibleEditors) {
+			await vscode.commands.executeCommand("workbench.action.newGroupRight")
+		}
+		const targetCol = hasVisibleEditors ? Math.max(lastCol + 1, 1) : vscode.ViewColumn.Two
+
 		const panel = vscode.window.createWebviewPanel(ClaudeDevProvider.tabPanelId, "Claude Dev", targetCol, {
 			enableScripts: true,
 			retainContextWhenHidden: true,
 			localResourceRoots: [context.extensionUri],
 		})
 		// TODO: use better svg icon with light and dark variants (see https://stackoverflow.com/questions/58365687/vscode-extension-iconpath)
-		panel.iconPath = vscode.Uri.joinPath(context.extensionUri, "icon.png")
+
+		panel.iconPath = {
+			light: vscode.Uri.joinPath(context.extensionUri, "icons", "robot_panel_light.png"),
+			dark: vscode.Uri.joinPath(context.extensionUri, "icons", "robot_panel_dark.png"),
+		}
 		tabProvider.resolveWebviewView(panel)
 
 		// Lock the editor group so clicking on files doesn't open them over the panel
-		new Promise((resolve) => setTimeout(resolve, 100)).then(() => {
-			vscode.commands.executeCommand("workbench.action.lockEditorGroup")
-		})
+		await delay(100)
+		await vscode.commands.executeCommand("workbench.action.lockEditorGroup")
 	}
 
 	context.subscriptions.push(vscode.commands.registerCommand("claude-dev.popoutButtonTapped", openClaudeDevInNewTab))

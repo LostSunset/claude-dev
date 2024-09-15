@@ -17,6 +17,8 @@ export interface WebviewMessage {
 		| "exportTaskWithId"
 		| "resetState"
 		| "requestOllamaModels"
+		| "openImage"
+		| "openFile"
 	text?: string
 	askResponse?: ClaudeAskResponse
 	apiConfiguration?: ApiConfiguration

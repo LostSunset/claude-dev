@@ -1,13 +1,13 @@
-import { VSCodeBadge, VSCodeButton, VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react"
+import { VSCodeBadge, VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react"
+import deepEqual from "fast-deep-equal"
 import React, { memo, useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import { ClaudeMessage, ClaudeSayTool } from "../../../src/shared/ExtensionMessage"
 import { COMMAND_OUTPUT_STRING } from "../../../src/shared/combineCommandSequences"
-import CodeAccordian from "./CodeAccordian"
-import CodeBlock from "./CodeBlock"
-import Terminal from "./Terminal"
+import CodeAccordian, { removeLeadingNonAlphanumeric } from "./CodeAccordian"
+import CodeBlock, { CODE_BLOCK_BG_COLOR } from "./CodeBlock"
 import Thumbnails from "./Thumbnails"
-import deepEqual from "fast-deep-equal"
+import { vscode } from "../utils/vscode"
 
 interface ChatRowProps {
 	message: ClaudeMessage
@@ -15,7 +15,6 @@ interface ChatRowProps {
 	onToggleExpand: () => void
 	lastModifiedMessage?: ClaudeMessage
 	isLast: boolean
-	handleSendStdin: (text: string) => void
 }
 
 const ChatRow = memo(
@@ -36,14 +35,7 @@ const ChatRow = memo(
 
 export default ChatRow
 
-const ChatRowContent = ({
-	message,
-	isExpanded,
-	onToggleExpand,
-	lastModifiedMessage,
-	isLast,
-	handleSendStdin,
-}: ChatRowProps) => {
+const ChatRowContent = ({ message, isExpanded, onToggleExpand, lastModifiedMessage, isLast }: ChatRowProps) => {
 	const cost = useMemo(() => {
 		if (message.text != null && message.say === "api_req_started") {
 			return JSON.parse(message.text).cost
@@ -112,11 +104,11 @@ const ChatRowContent = ({
 						<ProgressIndicator />
 					),
 					cost != null ? (
-						<span style={{ color: normalColor, fontWeight: "bold" }}>API Request Complete</span>
+						<span style={{ color: normalColor, fontWeight: "bold" }}>API Request</span>
 					) : apiRequestFailedMessage ? (
 						<span style={{ color: errorColor, fontWeight: "bold" }}>API Request Failed</span>
 					) : (
-						<span style={{ color: normalColor, fontWeight: "bold" }}>Making API Request...</span>
+						<span style={{ color: normalColor, fontWeight: "bold" }}>API Request...</span>
 					),
 				]
 			case "followup":
@@ -199,12 +191,51 @@ const ChatRowContent = ({
 								{message.type === "ask" ? "Claude wants to read this file:" : "Claude read this file:"}
 							</span>
 						</div>
-						<CodeAccordian
+						{/* <CodeAccordian
 							code={tool.content!}
 							path={tool.path!}
 							isExpanded={isExpanded}
 							onToggleExpand={onToggleExpand}
-						/>
+						/> */}
+						<div
+							style={{
+								borderRadius: 3,
+								backgroundColor: CODE_BLOCK_BG_COLOR,
+								overflow: "hidden",
+								border: "1px solid var(--vscode-editorGroup-border)",
+							}}>
+							<div
+								style={{
+									color: "var(--vscode-descriptionForeground)",
+									display: "flex",
+									justifyContent: "space-between",
+									alignItems: "center",
+									padding: "9px 10px",
+									cursor: "pointer",
+									userSelect: "none",
+									WebkitUserSelect: "none",
+									MozUserSelect: "none",
+									msUserSelect: "none",
+								}}
+								onClick={() => {
+									vscode.postMessage({ type: "openFile", text: tool.content })
+								}}>
+								<span
+									style={{
+										whiteSpace: "nowrap",
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										marginRight: "8px",
+										direction: "rtl",
+										textAlign: "left",
+									}}>
+									{removeLeadingNonAlphanumeric(tool.path ?? "") + "\u200E"}
+								</span>
+								<span
+									className={`codicon codicon-link-external`}
+									style={{ fontSize: 13.5, margin: "1px 0" }}></span>
+							</div>
+						</div>
 					</>
 				)
 			case "listFilesTopLevel":
@@ -308,15 +339,19 @@ const ChatRowContent = ({
 									...headerStyle,
 									marginBottom: cost == null && apiRequestFailedMessage ? 10 : 0,
 									justifyContent: "space-between",
-								}}>
+									cursor: "pointer",
+									userSelect: "none",
+									WebkitUserSelect: "none",
+									MozUserSelect: "none",
+									msUserSelect: "none",
+								}}
+								onClick={onToggleExpand}>
 								<div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
 									{icon}
 									{title}
 									{cost != null && cost > 0 && <VSCodeBadge>${Number(cost)?.toFixed(4)}</VSCodeBadge>}
 								</div>
-								<VSCodeButton appearance="icon" aria-label="Toggle Details" onClick={onToggleExpand}>
-									<span className={`codicon codicon-chevron-${isExpanded ? "up" : "down"}`}></span>
-								</VSCodeButton>
+								<span className={`codicon codicon-chevron-${isExpanded ? "up" : "down"}`}></span>
 							</div>
 							{cost == null && apiRequestFailedMessage && (
 								<>
@@ -361,8 +396,8 @@ const ChatRowContent = ({
 							{isExpanded && (
 								<div style={{ marginTop: "10px" }}>
 									<CodeAccordian
-										code={JSON.stringify(JSON.parse(message.text || "{}").request, null, 2)}
-										language="json"
+										code={JSON.parse(message.text || "{}").request}
+										language="markdown"
 										isExpanded={true}
 										onToggleExpand={onToggleExpand}
 									/>
@@ -385,7 +420,7 @@ const ChatRowContent = ({
 								backgroundColor: "var(--vscode-badge-background)",
 								color: "var(--vscode-badge-foreground)",
 								borderRadius: "3px",
-								padding: "8px",
+								padding: "9px",
 								whiteSpace: "pre-line",
 								wordWrap: "break-word",
 							}}>
@@ -400,24 +435,12 @@ const ChatRowContent = ({
 					return (
 						<div
 							style={{
-								backgroundColor: "var(--vscode-editor-inactiveSelectionBackground)",
-								borderRadius: "3px",
-								padding: "8px",
-								whiteSpace: "pre-line",
-								wordWrap: "break-word",
+								marginTop: -10,
+								width: "100%",
 							}}>
-							<span
-								style={{
-									display: "block",
-									fontStyle: "italic",
-									marginBottom: "8px",
-									opacity: 0.8,
-								}}>
-								The user made the following changes:
-							</span>
 							<CodeAccordian
 								diff={tool.diff!}
-								path={tool.path!}
+								isFeedback={true}
 								isExpanded={isExpanded}
 								onToggleExpand={onToggleExpand}
 							/>
@@ -442,8 +465,46 @@ const ChatRowContent = ({
 								{icon}
 								{title}
 							</div>
-							<div style={{ color: "var(--vscode-charts-green)" }}>
+							<div style={{ color: "var(--vscode-charts-green)", paddingTop: 10 }}>
 								<Markdown markdown={message.text} />
+							</div>
+						</>
+					)
+				case "shell_integration_warning":
+					return (
+						<>
+							<div
+								style={{
+									display: "flex",
+									flexDirection: "column",
+									backgroundColor: "rgba(255, 191, 0, 0.1)",
+									padding: 8,
+									borderRadius: 3,
+									fontSize: 12,
+								}}>
+								<div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+									<i
+										className="codicon codicon-warning"
+										style={{
+											marginRight: 8,
+											fontSize: 18,
+											color: "#FFA500",
+										}}></i>
+									<span style={{ fontWeight: 500, color: "#FFA500" }}>
+										Shell Integration Unavailable
+									</span>
+								</div>
+								<div>
+									Claude won't be able to view the command's output. Please update VSCode (
+									<code>CMD/CTRL + Shift + P</code> → "Update") and make sure you're using a supported
+									shell: zsh, bash, fish, or PowerShell (<code>CMD/CTRL + Shift + P</code> →
+									"Terminal: Select Default Profile").{" "}
+									<a
+										href="https://github.com/saoudrizwan/claude-dev/wiki/Troubleshooting-%E2%80%90-Shell-Integration-Unavailable"
+										style={{ color: "inherit", textDecoration: "underline" }}>
+										Still having trouble?
+									</a>
+								</div>
 							</div>
 						</>
 					)
@@ -457,7 +518,7 @@ const ChatRowContent = ({
 									{title}
 								</div>
 							)}
-							<div>
+							<div style={{ paddingTop: 10 }}>
 								<Markdown markdown={message.text} />
 							</div>
 						</>
@@ -483,7 +544,25 @@ const ChatRowContent = ({
 						}
 						return {
 							command: text.slice(0, outputIndex).trim(),
-							output: text.slice(outputIndex + COMMAND_OUTPUT_STRING.length).trim() + " ",
+							output: text
+								.slice(outputIndex + COMMAND_OUTPUT_STRING.length)
+								.trim()
+								.split("")
+								.map((char) => {
+									switch (char) {
+										case "\t":
+											return "→   "
+										case "\b":
+											return "⌫"
+										case "\f":
+											return "⏏"
+										case "\v":
+											return "⇳"
+										default:
+											return char
+									}
+								})
+								.join(""),
 						}
 					}
 
@@ -494,11 +573,41 @@ const ChatRowContent = ({
 								{icon}
 								{title}
 							</div>
-							<Terminal
+							{/* <Terminal
 								rawOutput={command + (output ? "\n" + output : "")}
-								handleSendStdin={handleSendStdin}
 								shouldAllowInput={!!isCommandExecuting && output.length > 0}
-							/>
+							/> */}
+							<div
+								style={{
+									borderRadius: 3,
+									border: "1px solid var(--vscode-editorGroup-border)",
+									overflow: "hidden",
+									backgroundColor: CODE_BLOCK_BG_COLOR,
+								}}>
+								<CodeBlock source={`${"```"}shell\n${command}\n${"```"}`} forceWrap={true} />
+								{output.length > 0 && (
+									<div style={{ width: "100%" }}>
+										<div
+											onClick={onToggleExpand}
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: "4px",
+												width: "100%",
+												justifyContent: "flex-start",
+												cursor: "pointer",
+												padding: `2px 8px ${isExpanded ? 0 : 8}px 8px`,
+											}}>
+											<span
+												className={`codicon codicon-chevron-${
+													isExpanded ? "down" : "right"
+												}`}></span>
+											<span style={{ fontSize: "0.8em" }}>Command Output</span>
+										</div>
+										{isExpanded && <CodeBlock source={`${"```"}shell\n${output}\n${"```"}`} />}
+									</div>
+								)}
+							</div>
 						</>
 					)
 				case "completion_result":
@@ -509,7 +618,7 @@ const ChatRowContent = ({
 									{icon}
 									{title}
 								</div>
-								<div style={{ color: "var(--vscode-charts-green)" }}>
+								<div style={{ color: "var(--vscode-charts-green)", paddingTop: 10 }}>
 									<Markdown markdown={message.text} />
 								</div>
 							</div>
@@ -526,7 +635,7 @@ const ChatRowContent = ({
 									{title}
 								</div>
 							)}
-							<div>
+							<div style={{ paddingTop: 10 }}>
 								<Markdown markdown={message.text} />
 							</div>
 						</>
@@ -556,10 +665,11 @@ const Markdown = memo(({ markdown }: { markdown?: string }) => {
 	// react-markdown lets us customize elements, so here we're using their example of replacing code blocks with SyntaxHighlighter. However when there are no language matches (` or ``` without a language specifier) then we default to a normal code element for inline code. Code blocks without a language specifier shouldn't be a common occurrence as we prompt Claude to always use a language specifier.
 	// when claude wraps text in thinking tags, he doesnt use line breaks so we need to insert those ourselves to render markdown correctly
 	const parsed = markdown?.replace(/<thinking>([\s\S]*?)<\/thinking>/g, (match, content) => {
-		return `_<thinking>_\n\n${content}\n\n_</thinking>_`
+		return content
+		// return `_<thinking>_\n\n${content}\n\n_</thinking>_`
 	})
 	return (
-		<div style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
+		<div style={{ wordBreak: "break-word", overflowWrap: "anywhere", marginBottom: -10, marginTop: -10 }}>
 			<ReactMarkdown
 				children={parsed}
 				components={{
@@ -570,8 +680,8 @@ const Markdown = memo(({ markdown }: { markdown?: string }) => {
 								style={{
 									...style,
 									margin: 0,
-									marginTop: 0,
-									marginBottom: 0,
+									marginTop: 10,
+									marginBottom: 10,
 									whiteSpace: "pre-wrap",
 									wordBreak: "break-word",
 									overflowWrap: "anywhere",
@@ -610,6 +720,20 @@ const Markdown = memo(({ markdown }: { markdown?: string }) => {
 							/>
 						)
 					},
+					// pre always surrounds a code, and we custom handle code blocks below. Pre has some non-10 margin, while all other elements in markdown have a 10 top/bottom margin and the outer div has a -10 top/bottom margin to counteract this between chat rows. However we render markdown in a completion_result row so make sure to add padding as necessary when used within other rows.
+					pre(props) {
+						const { style, ...rest } = props
+						return (
+							<pre
+								style={{
+									...style,
+									marginTop: 10,
+									marginBlock: 10,
+								}}
+								{...rest}
+							/>
+						)
+					},
 					// https://github.com/remarkjs/react-markdown?tab=readme-ov-file#use-custom-components-syntax-highlight
 					code(props) {
 						const { children, className, node, ...rest } = props
@@ -618,7 +742,7 @@ const Markdown = memo(({ markdown }: { markdown?: string }) => {
 							<div
 								style={{
 									borderRadius: 3,
-									border: "1px solid var(--vscode-sideBar-border)",
+									border: "1px solid var(--vscode-editorGroup-border)",
 									overflow: "hidden",
 								}}>
 								<CodeBlock
@@ -633,6 +757,13 @@ const Markdown = memo(({ markdown }: { markdown?: string }) => {
 									whiteSpace: "pre-line",
 									wordBreak: "break-word",
 									overflowWrap: "anywhere",
+									backgroundColor: "var(--vscode-textCodeBlock-background)",
+									color: "var(--vscode-textPreformat-foreground)",
+									fontFamily: "var(--vscode-editor-font-family)",
+									fontSize: "var(--vscode-editor-font-size)",
+									borderRadius: "3px",
+									border: "1px solid var(--vscode-textSeparator-foreground)",
+									// padding: "2px 4px",
 								}}>
 								{children}
 							</code>

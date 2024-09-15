@@ -20,6 +20,7 @@ const Announcement = ({ version, hideAnnouncement }: AnnouncementProps) => {
 				padding: "12px 16px",
 				margin: "5px 15px 5px 15px",
 				position: "relative",
+				flexShrink: 0,
 			}}>
 			<VSCodeButton
 				appearance="icon"
@@ -30,8 +31,15 @@ const Announcement = ({ version, hideAnnouncement }: AnnouncementProps) => {
 			<h3 style={{ margin: "0 0 8px" }}>
 				🎉{"  "}New in v{version}
 			</h3>
-			<ul style={{ margin: "0 0 8px", paddingLeft: "12px" }}>
-				{/* <li>
+			<p style={{ margin: "5px 0px" }}>
+				Claude can now monitor workspace problems to keep updated on linter/compiler/build issues, letting him
+				proactively fix errors on his own! (adding missing imports, fixing type errors, etc.)
+				<VSCodeLink style={{ display: "inline" }} href="https://x.com/sdrzn/status/1835100787275419829">
+					See a demo here.
+				</VSCodeLink>
+			</p>
+			{/*<ul style={{ margin: "0 0 8px", paddingLeft: "12px" }}>
+				 <li>
 					OpenRouter now supports prompt caching! They also have much higher rate limits than other providers,
 					so I recommend trying them out.
 					<br />
@@ -62,7 +70,7 @@ const Announcement = ({ version, hideAnnouncement }: AnnouncementProps) => {
 							Switch to OpenRouter
 						</VSCodeButton>
 					)}
-				</li> */}
+				</li> 
 				<li>
 					<b>Edit Claude's changes before accepting!</b> When he creates or edits a file, you can modify his
 					changes directly in the right side of the diff view (+ hover over the 'Revert Block' arrow button in
@@ -76,7 +84,7 @@ const Announcement = ({ version, hideAnnouncement }: AnnouncementProps) => {
 					When Claude runs commands, you can now type directly in the terminal (+ support for Python
 					environments)
 				</li>
-			</ul>
+			</ul>*/}
 			<p style={{ margin: "0" }}>
 				Follow me for more updates!{" "}
 				<VSCodeLink href="https://x.com/sdrzn" style={{ display: "inline" }}>
